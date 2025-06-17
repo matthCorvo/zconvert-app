@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Calculator, History, Settings, Database } from 'lucide-react';
 
 // Constantes pour les types de disques
@@ -289,7 +290,7 @@ const SimulationPanel = ({ onSimulate, simulation }) => {
   );
 };
 
-// Écran Convertisseur
+// Écran Convertisseur (Page Home)
 const ConverterScreen = () => {
   const [inputValue, setInputValue] = useState('');
   const [selectedUnit, setSelectedUnit] = useState('CYL');
@@ -508,45 +509,57 @@ const SettingsScreen = () => (
   </div>
 );
 
-// Application principale
-const ZConvertApp = () => {
-  const [activeTab, setActiveTab] = useState('converter');
-
+// Composant Navigation
+const Navigation = () => {
+  const location = useLocation();
+  
   const tabs = [
-    { id: 'converter', label: 'Convertisseur', icon: Calculator, component: ConverterScreen },
-    { id: 'zfs', label: 'ZFS', icon: Database, component: ZfsScreen },
-    { id: 'history', label: 'Historique', icon: History, component: HistoryScreen },
-    { id: 'settings', label: 'Paramètres', icon: Settings, component: SettingsScreen }
+    { path: '/', label: 'Convertisseur', icon: Calculator },
+    { path: '/zfs', label: 'ZFS', icon: Database },
+    { path: '/history', label: 'Historique', icon: History },
+    { path: '/settings', label: 'Paramètres', icon: Settings }
   ];
 
-  const ActiveComponent = tabs.find(tab => tab.id === activeTab)?.component || ConverterScreen;
+  return (
+    <nav className="nav-container">
+      <div className="nav-tabs">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = location.pathname === tab.path;
+          return (
+            <Link
+              key={tab.path}
+              to={tab.path}
+              className={`nav-tab ${isActive ? 'active' : ''}`}
+            >
+              <Icon size={18} />
+              <span className="nav-tab-text sm-inline">{tab.label}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+};
 
+// Application principale avec React Router
+const App = () => {
   return (
     <div className="app-container">
       <header className="header">
         <h1>ZConvert - Convertisseur Mainframe</h1>
       </header>
 
-      <nav className="nav-container">
-        <div className="nav-tabs">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`nav-tab ${activeTab === tab.id ? 'active' : ''}`}
-              >
-                <Icon size={18} />
-                <span className="nav-tab-text sm-inline">{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </nav>
+      <Navigation />
 
       <main className="main-content">
-        <ActiveComponent />
+        <Routes>
+          <Route path="/" element={<ConverterScreen />} />
+          <Route path="/zfs" element={<ZfsScreen />} />
+          <Route path="/history" element={<HistoryScreen />} />
+          <Route path="/settings" element={<SettingsScreen />} />
+          <Route path="*" element={<ConverterScreen />} />
+        </Routes>
       </main>
 
       <footer className="footer">
@@ -556,4 +569,4 @@ const ZConvertApp = () => {
   );
 };
 
-export default ZConvertApp;
+export default App;
