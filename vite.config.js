@@ -4,5 +4,5 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: process.VITE_BASE_PATH || "/zconvert-app",
+  base: "/", // Simplement utiliser "/" pour Vercel
 });
