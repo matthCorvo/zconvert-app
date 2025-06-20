@@ -365,148 +365,86 @@ const ConverterScreen = () => {
   );
 };
 
-// Service ZFS Calculator - MODIFIÉ pour supporter les pourcentages
-class ZfsCalculatorService {
-  static calculateUsagePercentage(usedSpace, totalSpace) {
-    if (!totalSpace || totalSpace <= 0) return 0;
-    return (usedSpace / totalSpace) * 100;
-  }
-
-  static calculateFreeSpace(totalSpace, usedSpace) {
-    return Math.max(0, totalSpace - usedSpace);
-  }
-
-  static convertUnit(value, fromUnit, toUnit) {
-    if (fromUnit === toUnit) return value;
-    if (fromUnit === 'bytes' && toUnit === 'mb') {
-      return value / (1024 * 1024);
-    }
-    if (fromUnit === 'mb' && toUnit === 'bytes') {
-      return value * 1024 * 1024;
-    }
-    return value;
-  }
-
-  static simulateExpansion(currentZfs, additionalSpace, unit) {
-    let additionalInBytes;
-    
-    // NOUVEAU : Gestion des pourcentages
-    if (unit === 'percentage') {
-      additionalInBytes = (currentZfs.totalSpace * additionalSpace) / 100;
-    } else {
-      additionalInBytes = this.convertUnit(additionalSpace, unit, 'bytes');
-    }
-    
-    const newTotalSpace = currentZfs.totalSpace + additionalInBytes;
-    const newPercentUsed = this.calculateUsagePercentage(currentZfs.usedSpace, newTotalSpace);
-    const newFreeSpace = this.calculateFreeSpace(newTotalSpace, currentZfs.usedSpace);
-
-    return {
-      projectedTotalSpace: newTotalSpace,
-      projectedPercentUsed: newPercentUsed,
-      projectedFreeSpace: newFreeSpace,
-      additionalSpace: additionalInBytes
-    };
-  }
-}
-
-// Composant Simulation Panel - MODIFIÉ pour supporter les pourcentages
-const SimulationPanel = ({ onSimulate, simulation }) => {
-  const [additionalSpace, setAdditionalSpace] = useState('');
+// Écran ZFS Calculator
+const ZfsScreen = () => {
+  const [totalSpace, setTotalSpace] = useState('');
+  const [usedSpace, setUsedSpace] = useState('');
   const [unit, setUnit] = useState('mb');
+  const [simulation, setSimulation] = useState(null);
 
-  const handleSimulate = () => {
-    if (additionalSpace && parseFloat(additionalSpace) > 0) {
-      onSimulate(parseFloat(additionalSpace), unit);
-    }
-  };
+  const totalSpaceBytes = unit === 'mb' ? parseFloat(totalSpace || 0) * 1024 * 1024 : parseFloat(totalSpace || 0);
+  const usedSpaceBytes = unit === 'mb' ? parseFloat(usedSpace || 0) * 1024 * 1024 : parseFloat(usedSpace || 0);
+  const freeSpace = ZfsCalculatorService.calculateFreeSpace(totalSpaceBytes, usedSpaceBytes);
+  const percentUsed = ZfsCalculatorService.calculateUsagePercentage(usedSpaceBytes, totalSpaceBytes);
 
-  const formatValue = (value) => {
-    if (unit === 'mb') return (value / (1024 * 1024)).toFixed(2);
-    return value.toFixed(0);
-  };
-
-  // NOUVEAU : Fonction pour formater l'affichage selon l'unité
-  const getUnitLabel = () => {
-    switch(unit) {
-      case 'percentage': return '%';
-      case 'mb': return 'MB';
-      case 'bytes': return 'Bytes';
-      default: return unit.toUpperCase();
-    }
-  };
-
-  const getPlaceholder = () => {
-    switch(unit) {
-      case 'percentage': return 'Pourcentage à ajouter (ex: 20)';
-      case 'mb': return 'Espace à ajouter en MB';
-      case 'bytes': return 'Espace à ajouter en Bytes';
-      default: return 'Espace à ajouter';
-    }
+  const handleSimulation = (additionalSpace, simUnit) => {
+    const currentZfs = {
+      totalSpace: totalSpaceBytes,
+      usedSpace: usedSpaceBytes
+    };
+    
+    const result = ZfsCalculatorService.simulateExpansion(currentZfs, additionalSpace, simUnit);
+    setSimulation(result);
   };
 
   return (
-    <div className="card">
-      <h3 className="results-title">Simulation d'expansion</h3>
-      
-      <div className="flex gap-2 mb-4" style={{ flexWrap: 'wrap' }}>
-        <input
-          type="number"
-          value={additionalSpace}
-          onChange={(e) => setAdditionalSpace(e.target.value)}
-          placeholder={getPlaceholder()}
-          className="form-input"
-          style={{ flex: '1', minWidth: '200px' }}
-        />
-        <select
-          value={unit}
-          onChange={(e) => setUnit(e.target.value)}
-          className="form-input"
-          style={{ width: 'auto' }}
-        >
-          <option value="percentage">% (Pourcentage)</option>
-          <option value="mb">MB</option>
-          <option value="bytes">Bytes</option>
-        </select>
-        <button
-          onClick={handleSimulate}
-          className="btn btn-primary"
-        >
-          Simuler
-        </button>
+    <div className="space-y-6">
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <Database style={{ marginRight: '0.5rem' }} />
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'var(--text-accent)' }}>
+          Calculateur ZFS
+        </h2>
       </div>
 
-      {simulation && (
-        <div style={{ paddingTop: '0.75rem', borderTop: '1px solid #374151' }}>
-          <h4 className="results-label" style={{ marginBottom: '0.5rem', fontWeight: '500' }}>
-            Résultats de la simulation:
-          </h4>
-          <div className="results-item">
-            <span className="results-label">Espace ajouté:</span>
-            <span className="results-value">
-              {formatValue(simulation.additionalSpace)} MB
-              {unit === 'percentage' && ` (${additionalSpace}%)`}
-            </span>
-          </div>
-          <div className="results-item">
-            <span className="results-label">Nouveau total:</span>
-            <span className="results-value">
-              {formatValue(simulation.projectedTotalSpace)} MB
-            </span>
-          </div>
-          <div className="results-item">
-            <span className="results-label">Nouvelle utilisation:</span>
-            <span className="results-value">
-              {simulation.projectedPercentUsed.toFixed(1)}%
-            </span>
-          </div>
-          <div className="results-item">
-            <span className="results-label">Nouvel espace libre:</span>
-            <span className="results-value">
-              {formatValue(simulation.projectedFreeSpace)} MB
-            </span>
-          </div>
+      <div className="form-group">
+        <label className="form-label">Unité d'affichage</label>
+        <div className="btn-group">
+          <button
+            onClick={() => setUnit('bytes')}
+            className={unit === 'bytes' ? 'btn btn-primary' : 'btn btn-secondary'}
+          >
+            Bytes
+          </button>
+          <button
+            onClick={() => setUnit('mb')}
+            className={unit === 'mb' ? 'btn btn-primary' : 'btn btn-secondary'}
+          >
+            MB
+          </button>
         </div>
+      </div>
+
+      <InputField
+        label="Espace total"
+        value={totalSpace}
+        onChange={setTotalSpace}
+        unit={unit.toUpperCase()}
+        placeholder="Taille totale du zFS"
+      />
+
+      <InputField
+        label="Espace utilisé"
+        value={usedSpace}
+        onChange={setUsedSpace}
+        unit={unit.toUpperCase()}
+        placeholder="Espace actuellement utilisé"
+      />
+
+      {totalSpace && usedSpace && parseFloat(totalSpace) > 0 && parseFloat(usedSpace) >= 0 && (
+        <UsageDisplay
+          totalSpace={totalSpaceBytes}
+          usedSpace={usedSpaceBytes}
+          freeSpace={freeSpace}
+          percentUsed={percentUsed}
+          unit={unit}
+        />
+      )}
+
+      {totalSpace && usedSpace && (
+        <SimulationPanel
+          onSimulate={handleSimulation}
+          simulation={simulation}
+        />
       )}
     </div>
   );
