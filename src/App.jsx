@@ -31,9 +31,9 @@ class ConversionService {
 
   static convert(value, fromUnit, toUnit, diskType) {
     if (!value || value <= 0) return 0;
-    
+
     let tracks = 0;
-    
+
     switch (fromUnit) {
       case 'CYL':
         tracks = this.cylindersToTracks(value, diskType);
@@ -47,7 +47,7 @@ class ConversionService {
       default:
         return 0;
     }
-    
+
     switch (toUnit) {
       case 'CYL':
         return this.tracksToCylinders(tracks, diskType);
@@ -83,8 +83,15 @@ class ZfsCalculatorService {
     return value;
   }
 
-  static simulateExpansion(currentZfs, additionalSpace, unit) {
-    const additionalInBytes = this.convertUnit(additionalSpace, unit, 'bytes');
+  static simulateExpansion(currentZfs, additionalSpace, unit, percentToAdd = 0) {
+    let additionalInBytes = this.convertUnit(additionalSpace, unit, 'bytes');
+
+    // Si un pourcentage est fourni, on l'ajoute à l'espace additionnel
+    if (percentToAdd > 0) {
+      const percentAdditional = (currentZfs.totalSpace * percentToAdd) / 100;
+      additionalInBytes += percentAdditional;
+    }
+
     const newTotalSpace = currentZfs.totalSpace + additionalInBytes;
     const newPercentUsed = this.calculateUsagePercentage(currentZfs.usedSpace, newTotalSpace);
     const newFreeSpace = this.calculateFreeSpace(newTotalSpace, currentZfs.usedSpace);
@@ -98,131 +105,17 @@ class ZfsCalculatorService {
   }
 }
 
-// Composant Input Field
-const InputField = ({ label, value, onChange, unit, placeholder }) => (
-  <div className="form-group">
-    <label className="form-label">{label}</label>
-    <div className={unit ? "input-group" : ""}>
-      <input
-        type="number"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="form-input"
-      />
-      {unit && <span className="input-addon">{unit}</span>}
-    </div>
-  </div>
-);
-
-// Composant Unit Selector
-const UnitSelector = ({ selectedUnit, onUnitChange, units }) => (
-  <div className="form-group">
-    <label className="form-label">Unité source</label>
-    <div className="btn-group">
-      {units.map((unit) => (
-        <button
-          key={unit}
-          onClick={() => onUnitChange(unit)}
-          className={selectedUnit === unit ? 'btn btn-primary' : 'btn btn-secondary'}
-        >
-          {unit}
-        </button>
-      ))}
-    </div>
-  </div>
-);
-
-// Composant Results Display
-const ResultsDisplay = ({ results, title }) => (
-  <div className="results-container">
-    <h3 className="results-title">{title}</h3>
-    <div>
-      {Object.entries(results).map(([unit, value]) => (
-        <div key={unit} className="results-item">
-          <span className="results-label">{unit}:</span>
-          <span className="results-value">
-            {typeof value === 'number' ? value.toFixed(4) : value}
-          </span>
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
-// Composant Usage Display pour ZFS
-const UsageDisplay = ({ totalSpace, usedSpace, freeSpace, percentUsed, unit }) => {
-  const getProgressClass = (percent) => {
-    if (percent >= 90) return 'progress-critical';
-    if (percent >= 75) return 'progress-warning';
-    return 'progress-safe';
-  };
-
-  const formatValue = (value) => {
-    if (unit === 'mb') return (value / (1024 * 1024)).toFixed(2);
-    return value.toFixed(0);
-  };
-
-  return (
-    <div className="card">
-      <h3 className="results-title">Utilisation ZFS</h3>
-      
-      <div className="progress-container">
-        <div className="progress-header">
-          <span>Utilisation</span>
-          <span>{percentUsed.toFixed(1)}%</span>
-        </div>
-        <div className="progress-bar">
-          <div
-            className={`progress-fill ${getProgressClass(percentUsed)}`}
-            style={{ width: `${Math.min(percentUsed, 100)}%` }}
-          ></div>
-        </div>
-      </div>
-
-      <div>
-        <div className="results-item">
-          <span className="results-label">Total:</span>
-          <span className="results-value">
-            {formatValue(totalSpace)} {unit.toUpperCase()}
-          </span>
-        </div>
-        <div className="results-item">
-          <span className="results-label">Utilisé:</span>
-          <span className="results-value">
-            {formatValue(usedSpace)} {unit.toUpperCase()}
-          </span>
-        </div>
-        <div className="results-item">
-          <span className="results-label">Libre:</span>
-          <span className="results-value">
-            {formatValue(freeSpace)} {unit.toUpperCase()}
-          </span>
-        </div>
-      </div>
-
-      {percentUsed >= 90 && (
-        <div className="alert alert-critical">
-          ⚠️ Utilisation critique - Expansion recommandée
-        </div>
-      )}
-      {percentUsed >= 75 && percentUsed < 90 && (
-        <div className="alert alert-warning">
-          ⚠️ Utilisation élevée - Surveillance recommandée
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Composant Simulation Panel
+// Ajout du champ pourcentage dans le panneau de simulation
 const SimulationPanel = ({ onSimulate, simulation }) => {
   const [additionalSpace, setAdditionalSpace] = useState('');
+  const [percentToAdd, setPercentToAdd] = useState('');
   const [unit, setUnit] = useState('mb');
 
   const handleSimulate = () => {
-    if (additionalSpace && parseFloat(additionalSpace) > 0) {
-      onSimulate(parseFloat(additionalSpace), unit);
+    const space = parseFloat(additionalSpace) || 0;
+    const percent = parseFloat(percentToAdd) || 0;
+    if (space > 0 || percent > 0) {
+      onSimulate(space, unit, percent);
     }
   };
 
@@ -234,7 +127,7 @@ const SimulationPanel = ({ onSimulate, simulation }) => {
   return (
     <div className="card">
       <h3 className="results-title">Simulation d'expansion</h3>
-      
+
       <div className="flex gap-2 mb-4" style={{ flexWrap: 'wrap' }}>
         <input
           type="number"
@@ -243,6 +136,14 @@ const SimulationPanel = ({ onSimulate, simulation }) => {
           placeholder="Espace à ajouter"
           className="form-input"
           style={{ flex: '1', minWidth: '200px' }}
+        />
+        <input
+          type="number"
+          value={percentToAdd}
+          onChange={(e) => setPercentToAdd(e.target.value)}
+          placeholder="% à ajouter"
+          className="form-input"
+          style={{ width: '100px' }}
         />
         <select
           value={unit}
@@ -289,284 +190,3 @@ const SimulationPanel = ({ onSimulate, simulation }) => {
     </div>
   );
 };
-
-// Écran Convertisseur (Page Home)
-const ConverterScreen = () => {
-  const [inputValue, setInputValue] = useState('');
-  const [selectedUnit, setSelectedUnit] = useState('CYL');
-  const [diskType, setDiskType] = useState('3390');
-  const [results, setResults] = useState({});
-
-  useEffect(() => {
-    if (inputValue && parseFloat(inputValue) > 0) {
-      const value = parseFloat(inputValue);
-      const newResults = {};
-      
-      ['CYL', 'TRKS', 'MO'].forEach(unit => {
-        if (unit !== selectedUnit) {
-          newResults[unit] = ConversionService.convert(value, selectedUnit, unit, diskType);
-        }
-      });
-      
-      setResults(newResults);
-    } else {
-      setResults({});
-    }
-  }, [inputValue, selectedUnit, diskType]);
-
-  return (
-    <div className="space-y-6">
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <Calculator style={{ marginRight: '0.5rem' }} />
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'var(--text-accent)' }}>
-          Convertisseur Mainframe
-        </h2>
-      </div>
-      
-      <div className="form-group">
-        <label className="form-label">Type de disque</label>
-        <select
-          value={diskType}
-          onChange={(e) => setDiskType(e.target.value)}
-          className="form-input"
-        >
-          {Object.entries(DISK_TYPES).map(([id, type]) => (
-            <option key={id} value={id}>{type.name}</option>
-          ))}
-        </select>
-      </div>
-
-      <InputField
-        label="Valeur à convertir"
-        value={inputValue}
-        onChange={setInputValue}
-        placeholder="Entrez une valeur"
-      />
-
-      <UnitSelector
-        selectedUnit={selectedUnit}
-        onUnitChange={setSelectedUnit}
-        units={['CYL', 'TRKS', 'MO']}
-      />
-
-      {Object.keys(results).length > 0 && (
-        <ResultsDisplay results={results} title="Résultats de conversion" />
-      )}
-
-      <div className="card">
-        <h3 className="results-title">Formules de conversion ({DISK_TYPES[diskType].name})</h3>
-        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontFamily: 'Monaco, Menlo, monospace' }}>
-          <div>1 CYL = {DISK_TYPES[diskType].tracksPerCylinder} TRKS</div>
-          <div>1 TRK = {DISK_TYPES[diskType].bytesPerTrack.toLocaleString()} bytes</div>
-          <div>1 MB = 1,048,576 bytes</div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Écran ZFS Calculator
-const ZfsScreen = () => {
-  const [totalSpace, setTotalSpace] = useState('');
-  const [usedSpace, setUsedSpace] = useState('');
-  const [unit, setUnit] = useState('mb');
-  const [simulation, setSimulation] = useState(null);
-
-  const totalSpaceBytes = unit === 'mb' ? parseFloat(totalSpace || 0) * 1024 * 1024 : parseFloat(totalSpace || 0);
-  const usedSpaceBytes = unit === 'mb' ? parseFloat(usedSpace || 0) * 1024 * 1024 : parseFloat(usedSpace || 0);
-  const freeSpace = ZfsCalculatorService.calculateFreeSpace(totalSpaceBytes, usedSpaceBytes);
-  const percentUsed = ZfsCalculatorService.calculateUsagePercentage(usedSpaceBytes, totalSpaceBytes);
-
-  const handleSimulation = (additionalSpace, simUnit) => {
-    const currentZfs = {
-      totalSpace: totalSpaceBytes,
-      usedSpace: usedSpaceBytes
-    };
-    
-    const result = ZfsCalculatorService.simulateExpansion(currentZfs, additionalSpace, simUnit);
-    setSimulation(result);
-  };
-
-  return (
-    <div className="space-y-6">
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <Database style={{ marginRight: '0.5rem' }} />
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'var(--text-accent)' }}>
-          Calculateur ZFS
-        </h2>
-      </div>
-
-      <div className="form-group">
-        <label className="form-label">Unité d'affichage</label>
-        <div className="btn-group">
-          <button
-            onClick={() => setUnit('bytes')}
-            className={unit === 'bytes' ? 'btn btn-primary' : 'btn btn-secondary'}
-          >
-            Bytes
-          </button>
-          <button
-            onClick={() => setUnit('mb')}
-            className={unit === 'mb' ? 'btn btn-primary' : 'btn btn-secondary'}
-          >
-            MB
-          </button>
-        </div>
-      </div>
-
-      <InputField
-        label="Espace total"
-        value={totalSpace}
-        onChange={setTotalSpace}
-        unit={unit.toUpperCase()}
-        placeholder="Taille totale du zFS"
-      />
-
-      <InputField
-        label="Espace utilisé"
-        value={usedSpace}
-        onChange={setUsedSpace}
-        unit={unit.toUpperCase()}
-        placeholder="Espace actuellement utilisé"
-      />
-
-      {totalSpace && usedSpace && parseFloat(totalSpace) > 0 && parseFloat(usedSpace) >= 0 && (
-        <UsageDisplay
-          totalSpace={totalSpaceBytes}
-          usedSpace={usedSpaceBytes}
-          freeSpace={freeSpace}
-          percentUsed={percentUsed}
-          unit={unit}
-        />
-      )}
-
-      {totalSpace && usedSpace && (
-        <SimulationPanel
-          onSimulate={handleSimulation}
-          simulation={simulation}
-        />
-      )}
-    </div>
-  );
-};
-
-// Écran Historique
-const HistoryScreen = () => (
-  <div className="space-y-6">
-    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem' }}>
-      <History style={{ marginRight: '0.5rem' }} />
-      <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'var(--text-accent)' }}>
-        Historique
-      </h2>
-    </div>
-    <div className="card text-center">
-      <p style={{ color: 'var(--text-secondary)' }}>Aucun historique disponible</p>
-      <p style={{ fontSize: '0.875rem', color: 'var(--text-accent)', marginTop: '0.5rem' }}>
-        Les conversions apparaîtront ici
-      </p>
-    </div>
-  </div>
-);
-
-// Écran Paramètres
-const SettingsScreen = () => (
-  <div className="space-y-6">
-    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem' }}>
-      <Settings style={{ marginRight: '0.5rem' }} />
-      <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'var(--text-accent)' }}>
-        Paramètres
-      </h2>
-    </div>
-    <div className="card">
-      <h3 className="results-title">Configuration</h3>
-      <div className="space-y-4">
-        <div className="form-group">
-          <label className="form-label">Précision d'affichage</label>
-          <select className="form-input">
-            <option>4 décimales</option>
-            <option>2 décimales</option>
-            <option>6 décimales</option>
-          </select>
-        </div>
-        <div className="form-group">
-          <label className="form-label">Seuil d'alerte ZFS (%)</label>
-          <input
-            type="number"
-            defaultValue="75"
-            className="form-input"
-          />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Seuil critique ZFS (%)</label>
-          <input
-            type="number"
-            defaultValue="90"
-            className="form-input"
-          />
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
-// Composant Navigation
-const Navigation = () => {
-  const location = useLocation();
-  
-  const tabs = [
-    { path: '/', label: 'Convertisseur', icon: Calculator },
-    { path: '/zfs', label: 'ZFS', icon: Database },
-    { path: '/history', label: 'Historique', icon: History },
-    { path: '/settings', label: 'Paramètres', icon: Settings }
-  ];
-
-  return (
-    <nav className="nav-container">
-      <div className="nav-tabs">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = location.pathname === tab.path;
-          return (
-            <Link
-              key={tab.path}
-              to={tab.path}
-              className={`nav-tab ${isActive ? 'active' : ''}`}
-            >
-              <Icon size={18} />
-              <span className="nav-tab-text sm-inline">{tab.label}</span>
-            </Link>
-          );
-        })}
-      </div>
-    </nav>
-  );
-};
-
-// Application principale avec React Router
-const App = () => {
-  return (
-    <div className="app-container">
-      <header className="header">
-        <h1>ZConvert - Convertisseur Mainframe</h1>
-      </header>
-
-      <Navigation />
-
-      <main className="main-content">
-        <Routes>
-          <Route path="/" element={<ConverterScreen />} />
-          <Route path="/zfs" element={<ZfsScreen />} />
-          <Route path="/history" element={<HistoryScreen />} />
-          <Route path="/settings" element={<SettingsScreen />} />
-          <Route path="*" element={<ConverterScreen />} />
-        </Routes>
-      </main>
-
-      <footer className="footer">
-        ZConvert v1.0 - Convertisseur pour IBM z/OS
-      </footer>
-    </div>
-  );
-};
-
-export default App;
