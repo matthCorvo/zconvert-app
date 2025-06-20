@@ -234,13 +234,9 @@ const SimulationPanel = ({ onSimulate, simulation }) => {
     }
   };
 
-  // Fonction pour formater toujours en MB et Bytes
-  const formatValueInBytes = (bytes) => {
-    return bytes.toFixed(0);
-  };
-
-  const formatValueInMB = (bytes) => {
-    return (bytes / (1024 * 1024)).toFixed(2);
+  const formatValue = (value) => {
+    if (unit === 'mb') return (value / (1024 * 1024)).toFixed(2);
+    return value.toFixed(0);
   };
 
   return (
@@ -282,13 +278,14 @@ const SimulationPanel = ({ onSimulate, simulation }) => {
           <div className="results-item">
             <span className="results-label">Espace ajouté:</span>
             <span className="results-value">
-              {formatValueInMB(simulation.additionalSpace)} MB ({formatValueInBytes(simulation.additionalSpace)} bytes)
+              {formatValue(simulation.additionalSpace)} MB
+              {unit === 'percentage' && ` (${additionalSpace}%)`}
             </span>
           </div>
           <div className="results-item">
             <span className="results-label">Nouveau total:</span>
             <span className="results-value">
-              {formatValueInMB(simulation.projectedTotalSpace)} MB
+              {formatValue(simulation.projectedTotalSpace)} MB
             </span>
           </div>
           <div className="results-item">
@@ -300,7 +297,7 @@ const SimulationPanel = ({ onSimulate, simulation }) => {
           <div className="results-item">
             <span className="results-label">Nouvel espace libre:</span>
             <span className="results-value">
-              {formatValueInMB(simulation.projectedFreeSpace)} MB
+              {formatValue(simulation.projectedFreeSpace)} MB
             </span>
           </div>
         </div>
