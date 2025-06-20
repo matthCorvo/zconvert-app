@@ -61,7 +61,7 @@ class ConversionService {
   }
 }
 
-// Service ZFS Calculator
+// Service ZFS Calculator - MODIFIÉ pour supporter les pourcentages
 class ZfsCalculatorService {
   static calculateUsagePercentage(usedSpace, totalSpace) {
     if (!totalSpace || totalSpace <= 0) return 0;
@@ -84,7 +84,15 @@ class ZfsCalculatorService {
   }
 
   static simulateExpansion(currentZfs, additionalSpace, unit) {
-    const additionalInBytes = this.convertUnit(additionalSpace, unit, 'bytes');
+    let additionalInBytes;
+    
+    // NOUVEAU : Gestion des pourcentages
+    if (unit === 'percentage') {
+      additionalInBytes = (currentZfs.totalSpace * additionalSpace) / 100;
+    } else {
+      additionalInBytes = this.convertUnit(additionalSpace, unit, 'bytes');
+    }
+    
     const newTotalSpace = currentZfs.totalSpace + additionalInBytes;
     const newPercentUsed = this.calculateUsagePercentage(currentZfs.usedSpace, newTotalSpace);
     const newFreeSpace = this.calculateFreeSpace(newTotalSpace, currentZfs.usedSpace);
@@ -215,7 +223,7 @@ const UsageDisplay = ({ totalSpace, usedSpace, freeSpace, percentUsed, unit }) =
   );
 };
 
-// Composant Simulation Panel
+// Composant Simulation Panel - MODIFIÉ pour supporter les pourcentages
 const SimulationPanel = ({ onSimulate, simulation }) => {
   const [additionalSpace, setAdditionalSpace] = useState('');
   const [unit, setUnit] = useState('mb');
@@ -240,7 +248,7 @@ const SimulationPanel = ({ onSimulate, simulation }) => {
           type="number"
           value={additionalSpace}
           onChange={(e) => setAdditionalSpace(e.target.value)}
-          placeholder="Espace à ajouter"
+          placeholder={unit === 'percentage' ? 'Pourcentage à ajouter (ex: 20)' : 'Espace à ajouter'}
           className="form-input"
           style={{ flex: '1', minWidth: '200px' }}
         />
@@ -250,6 +258,7 @@ const SimulationPanel = ({ onSimulate, simulation }) => {
           className="form-input"
           style={{ width: 'auto' }}
         >
+          <option value="percentage">% (Pourcentage)</option>
           <option value="mb">MB</option>
           <option value="bytes">Bytes</option>
         </select>
@@ -267,9 +276,16 @@ const SimulationPanel = ({ onSimulate, simulation }) => {
             Résultats de la simulation:
           </h4>
           <div className="results-item">
+            <span className="results-label">Espace ajouté:</span>
+            <span className="results-value">
+              {formatValue(simulation.additionalSpace)} MB
+              {unit === 'percentage' && ` (${additionalSpace}%)`}
+            </span>
+          </div>
+          <div className="results-item">
             <span className="results-label">Nouveau total:</span>
             <span className="results-value">
-              {formatValue(simulation.projectedTotalSpace)} {unit.toUpperCase()}
+              {formatValue(simulation.projectedTotalSpace)} MB
             </span>
           </div>
           <div className="results-item">
@@ -281,7 +297,7 @@ const SimulationPanel = ({ onSimulate, simulation }) => {
           <div className="results-item">
             <span className="results-label">Nouvel espace libre:</span>
             <span className="results-value">
-              {formatValue(simulation.projectedFreeSpace)} {unit.toUpperCase()}
+              {formatValue(simulation.projectedFreeSpace)} MB
             </span>
           </div>
         </div>
